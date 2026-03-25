@@ -65,40 +65,41 @@ class NarrativeExtractor:
         log.info(f"Narrative extractor ready. Embedding dim: 384")
 
     def extract(self, text: str) -> Dict[str, np.ndarray]:
-        """
-        Embed the text for one second.
-
-        Args:
-            text : Space-joined words for this second.
-                   Empty string means no speech.
-
-        Returns:
-            {"narrative": (384,) float32} or empty dict if unavailable.
-            Returns previous embedding unchanged for empty text so that
-            EMA+KL produces zero surprise during silence.
-        """
         if not self.available:
             return {}
 
         if text.strip():
-            embedding = self._model.encode(
+            # Raw embedding for EMA+KL (surprise needs unbounded variance)
+            embedding_raw = self._model.encode(
                 text,
-                normalize_embeddings=True,   # L2-normalise for cosine-space EMA
+                normalize_embeddings=False,
                 show_progress_bar=False,
             ).astype(np.float32)
-            self._prev_embedding = embedding
-        else:
-            # No speech this second: carry forward previous embedding
-            if self._prev_embedding is None:
-                # Very start of film before any speech: return zeros
-                dim = self._model.get_sentence_embedding_dimension()
-                embedding = np.zeros(dim, dtype=np.float32)
-                self._prev_embedding = embedding
-            else:
-                embedding = self._prev_embedding
 
-        return {"narrative": embedding}
+            # Normalized embedding for raw features output (encoding model)
+            norm = np.linalg.norm(embedding_raw)
+            embedding_norm = embedding_raw / (norm + 1e-8) if norm > 1e-8 else embedding_raw
+
+            self._prev_embedding_raw = embedding_raw
+            self._prev_embedding_norm = embedding_norm
+        else:
+            if self._prev_embedding_raw is None:
+                dim = self._model.get_sentence_embedding_dimension()
+                embedding_raw = np.zeros(dim, dtype=np.float32)
+                embedding_norm = np.zeros(dim, dtype=np.float32)
+                self._prev_embedding_raw = embedding_raw
+                self._prev_embedding_norm = embedding_norm
+            else:
+                embedding_raw = self._prev_embedding_raw
+                embedding_norm = self._prev_embedding_norm
+
+        return {
+            "narrative": embedding_raw,          # → EMA+KL (surprise/uncertainty)
+            "narrative_norm": embedding_norm,     # → raw features output (df2)
+        }
 
     def reset(self) -> None:
         """Reset stored embedding. Call between films."""
-        self._prev_embedding = None
+        self._prev_embedding_raw = None
+        self._prev_embedding_norm = None
+

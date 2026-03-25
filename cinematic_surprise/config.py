@@ -52,6 +52,9 @@ AUDIO_SAMPLE_RATE = 22050           # Hz, librosa standard
 AUDIO_N_MELS      = 128             # mel frequency bands (A1 tonotopic resolution)
 AUDIO_N_FFT       = 2048            # FFT window in samples
 AUDIO_HOP_LENGTH  = 512             # STFT hop in samples (~43 frames/second)
+AUDIO_FMIN = 0.0                # Hz, lowest mel filter edge
+AUDIO_FMAX = None               # None = sr/2 (Nyquist), consistent with librosa default
+AUDIO_HTK  = False              # False = Slaney mel scale (librosa ≤0.10 default)
 
 # ── Optical flow ──────────────────────────────────────────────────────────────
 

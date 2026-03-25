@@ -453,11 +453,13 @@ class CinematicSurprisePipeline:
             text = transcript_reader.get_words(second_idx)
             nar_feat = self.narrative.extract(text)
             if "narrative" in nar_feat:
+                # EMA+KL uses raw (unnormalized) embedding for KL sensitivity
                 s, u = self.estimator.update(nar_feat["narrative"], "narrative")
                 row["surprise_narrative"]    = s
                 row["uncertainty_narrative"] = u
+                # Raw features output uses L2-normalized embedding for encoding models
                 row["_feat_narrative"]       = np.asarray(
-                    nar_feat["narrative"], dtype=np.float32
+                    nar_feat["narrative_norm"], dtype=np.float32
                 )
             else:
                 row["surprise_narrative"]    = np.nan
